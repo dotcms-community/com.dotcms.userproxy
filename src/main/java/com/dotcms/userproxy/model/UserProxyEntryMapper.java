@@ -1,5 +1,6 @@
 package com.dotcms.userproxy.model;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,46 +38,48 @@ public class UserProxyEntryMapper {
      * @return a list of UserProxyEntry objects
      */
     @SuppressWarnings("unchecked")
-    public static Optional<UserProxyEntry> parseJsonToEntries(final String jsonContent) {
+    public static List<UserProxyEntry> parseJsonToEntries(final String jsonContent) {
 
+        List<UserProxyEntry> entries = new ArrayList<>();
         try {
-            JSONObject json = new JSONObject(jsonContent).getJSONObject(CONFIG_KEY);
-
-            String userToken = json.getString(USER_TOKEN_KEY);
-            String methodString = json.getString(METHODS_KEY);
-            List<String> urls = json.getJSONArray(URLS_KEY);
-
-            return Optional.of(new UserProxyEntry(userToken, methodString, urls.toArray(new String[0])));
+            List<JSONObject> jsonArray = new JSONObject(jsonContent).getJSONArray(CONFIG_KEY);
+            for (JSONObject json : jsonArray) {
+                String userToken = json.getString(USER_TOKEN_KEY);
+                String methodString = json.getString(METHODS_KEY);
+                List<String> urls = json.getJSONArray(URLS_KEY);
+                entries.add(new UserProxyEntry(userToken, methodString, urls.toArray(new String[0])));
+            }
+            return Collections.unmodifiableList(entries);
         } catch (Exception e) {
             Logger.warn(UserProxyEntryMapper.class, "unable to parse json:" + e);
-            return Optional.empty();
+            return List.of();
         }
     }
 
-    public static Optional<UserProxyEntry> buildMapForHost(String hostIdentifier) {
+    public static List<UserProxyEntry> buildListForHost(String hostIdentifier) {
         try {
-            Host host  = APILocator.getHostAPI().find(hostIdentifier, APILocator.getUserAPI().getSystemUser(), false);
+            Host host = APILocator.getHostAPI().find(hostIdentifier, APILocator.getUserAPI().getSystemUser(), false);
 
-
-            Optional<UserProxyEntry> entry = mapUserProxyEntry(host);
-            if (entry.isPresent()) {
-                return entry;
+            List<UserProxyEntry> entries = mapUserProxyEntry(host);
+            if (!entries.isEmpty()) {
+                return entries;
             }
+
             return mapUserProxyEntry(APILocator.systemHost());
 
         } catch (Exception e) {
             Logger.warnAndDebug(UserProxyEntryMapper.class, "error building user proxy map:" + e.getMessage(), e);
         }
-        return Optional.empty();
+        return List.of();
     }
 
-    static Optional<UserProxyEntry> mapUserProxyEntry(Host host) {
+    static List<UserProxyEntry> mapUserProxyEntry(Host host) {
         Optional<AppSecrets> secret = Try
                 .of(() -> APILocator.getAppsAPI().getSecrets(AppKey.USER_PROXY_APP_VALUE.appValue,
                         host, APILocator.systemUser()))
                 .get();
         if (secret.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
         String config = secret.get().getSecrets().get(AppKey.APP_CONFIG_KEY.appValue).getString();
         return parseJsonToEntries(config);

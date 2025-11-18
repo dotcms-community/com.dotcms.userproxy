@@ -24,6 +24,12 @@ The User Proxy Plugin is a web interceptor-based solution for dotCMS that interc
 
 ## Installation
 
+Download the pre-built plugin:
+
+https://github.com/dotcms-community/com.dotcms.userproxy/blob/main/target/userproxy-25.10.05.jar
+
+
+
 ### Prerequisites
 
 - dotCMS 25.10.03 or later
@@ -61,27 +67,31 @@ target/userproxy-25.10.05.jar
 
 ## Configuration
 
-### Configuration File
-
-User proxy rules are configured in a JSON file (`userproxy.json`) that must be placed in your dotCMS `/apps` directory. The plugin automatically loads configurations for each site.
+User proxy rules are configured by using the User Proxy App.  This simple app takes a json object to configure the user to proxy and will automatically load the configurations for each site.  You can specify multiple paths and tokens per site - though only the first match will be returned. Additionally, if the specific site is not configured, the plugin will look for a fall back configuration from the System Host.
 
 ### Configuration Format
 
 ```json
-{
-    "config": 
-        {
-            "userToken": "your-jwt-token-here",
-            "methods": "GET,POST",
-            "urls": [
-                "/api/v1/page/json.*",
-                "/api/v1/content/_search.*",
-                "/api/v1/graphql/.*",
-                "/pages/protected-directory/.*"
-            ]
-        }
-    
-}
+    {
+        "config": [
+            {
+                "userToken": "api-user-token-0xZjQ....",
+                "methods": "GET,POST,HEAD,OPTIONS",
+                "urls": [
+                    "/api/v1/page/json*",
+                    "/api/v1/content/_search*",
+                    "/api/v1/graphql/*",
+                ]
+            },
+            {
+                "userToken": "page-user-token-7gf16....",
+                "methods": "GET",
+                "urls": [
+                    "/pages/protected/*"
+                ]
+            }
+        ]
+    }
 ```
 
 ### Configuration Parameters

@@ -2,6 +2,7 @@ package com.dotcms.userproxy.interceptor;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +35,7 @@ import io.vavr.control.Try;
  */
 public class UserProxyInterceptor implements WebInterceptor {
 
-    private static final ConcurrentHashMap<String,Optional<UserProxyEntry>> lazyUserProxyMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, List<UserProxyEntry>> lazyUserProxyMap = new ConcurrentHashMap<>();
 
     public UserProxyInterceptor() {
         resetLazyUserProxyMap();
@@ -58,24 +59,28 @@ public class UserProxyInterceptor implements WebInterceptor {
 
         Host host = WebAPILocator.getHostWebAPI().getCurrentHostNoThrow(request);
 
-        Optional<UserProxyEntry> entry = lazyUserProxyMap.computeIfAbsent(host.getIdentifier(),h->UserProxyEntryMapper.buildMapForHost(h));
+        List<UserProxyEntry> entries = lazyUserProxyMap.computeIfAbsent(host.getIdentifier(),
+                h -> UserProxyEntryMapper.buildListForHost(h));
 
-        if(entry.isEmpty()){
+        if (entries.isEmpty()) {
             return Result.NEXT;
         }
 
+        // break on first match
+        for (UserProxyEntry entry : entries) {
+            if (entry.matches(request)) {
+                final Optional<JWToken> token = APILocator.getApiTokenAPI()
+                        .fromJwt(new String(entry.getUserToken()),
+                                request.getRemoteAddr());
 
-        if (entry.get().matches(request)) {
-            final Optional<JWToken> token = APILocator.getApiTokenAPI().fromJwt(new String(entry.get().getUserToken()),
-                    request.getRemoteAddr());
+                User user = Try.of(() -> token.get().getActiveUser().get()).getOrNull();
 
-            User user = Try.of(() -> token.get().getActiveUser().get()).getOrNull();
-
-            if (user != null) {
-                request.setAttribute(WebKeys.USER, user);
-                request.setAttribute(WebKeys.USER_ID, user.getUserId());
+                if (user != null) {
+                    request.setAttribute(WebKeys.USER, user);
+                    request.setAttribute(WebKeys.USER_ID, user.getUserId());
+                    break;
+                }
             }
-
         }
 
         return Result.NEXT;
@@ -95,9 +100,12 @@ public class UserProxyInterceptor implements WebInterceptor {
     }
 
     public boolean matches(HttpServletRequest request, UserProxyEntry entry) {
-        String url = request.getRequestURI();
+        String url = getFullURL(request);
         String method = request.getMethod();
-        boolean methodMatch = Collections.binarySearch(entry.getMethods(), method) > -1;
+
+        if (!entry.getMethods().contains(method)) {
+            return false;
+        }
         boolean urlMatch = false;
         for (Pattern p : entry.getUrls()) {
             if (p.matcher(url).matches()) {
@@ -105,7 +113,18 @@ public class UserProxyInterceptor implements WebInterceptor {
                 break;
             }
         }
-        return methodMatch && urlMatch;
+        return urlMatch;
+    }
+
+    String getFullURL(HttpServletRequest request) {
+        StringBuilder requestURL = new StringBuilder(request.getRequestURL().toString());
+        String queryString = request.getQueryString();
+
+        if (queryString == null) {
+            return requestURL.toString();
+        } else {
+            return requestURL.append('?').append(queryString).toString();
+        }
     }
 
 }
