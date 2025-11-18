@@ -1,0 +1,31 @@
+---
+name: "User Proxy"
+description: "This allows you to set an API Token that will be appended to an incoming request (if one is not provided).  It can be used to allow for public access to specific APIs.  It uses a glob matching pattern to intercept the incoming requests."  
+iconUrl: "https://static.dotcms.com/assets/icons/apps/api-proxy.png"
+allowExtraParameters: false
+params:
+    configuration:
+        value: ''
+        hidden: false
+        type: 'STRING'
+        label: 'Configuration'
+        required: true
+        hint: |
+            Below is an example configuration:
+              ```
+              {
+                  "config": 
+                      {
+                          "userToken": "api-user-token-0xZjQwMmQ4ZjRhNzMiLCJ4bW9kIjoxNjk2NjEyNzI3M",
+                          "methods": "GET,POST,HEAD",
+                          "urls": [
+                              "/api/v1/page/json*",
+                              "/api/v1/content/_search*",
+                              "/api/v1/graphql/*",
+                              "/pages/my-protected-directory/*"
+                          ]
+                      }
+                  
+              }
+
+              ```

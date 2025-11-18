@@ -1,0 +1,17 @@
+target/
+.project
+.classpath
+.settings/
+.svn/
+.tmp/
+bin/
+# Intellij
+*.ipr
+*.iml
+.idea
+out/
+.DS_Store
+/bootstrap
+/dependencies.xml
+.java-version
+.dot-workspace.yml

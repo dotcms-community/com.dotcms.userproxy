@@ -1,0 +1,14 @@
+{
+    "config": [
+        {
+            "userToken": "api-user-token-0xZjQwMmQ4ZjRhNzMiLCJ4bW9kIjoxNjk2NjEyNzI3M",
+            "methods": "GET,POST",
+            "urls": [
+                "/api/v1/page/json*",
+                "/api/v1/content/_search*",
+                "/api/v1/graphql/*",
+                "/pages/my-protected-directory/*"
+            ]
+        }
+    ]
+}
