@@ -1,6 +1,6 @@
 # dotCMS User Proxy Plugin
 
-A dotCMS OSGI plugin that provides user proxy authentication and authorization capabilities. This plugin allows you to configure user tokens and map them to specific HTTP methods and URL patterns, enabling seamless user authentication for API requests without requiring explicit login credentials.
+A dotCMS OSGI plugin that provides user proxy authentication for API requests without requiring explicit login credentials. This plugin allows you to set a user token and map it to specific HTTP methods and URL patterns to allow access without having to pass user credientials.
 
 ## Overview
 
