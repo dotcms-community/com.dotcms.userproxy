@@ -14,6 +14,7 @@ The User Proxy Plugin is a web interceptor-based solution for dotCMS that interc
 ## Features
 
 - **Token-based Authentication**: Validate requests using JWT tokens associated with dotCMS users
+- **IP based Authentication**: Because tokens validity can be limited by IP, you can that limit access to this proxy by IP address as well.
 - **Method Filtering**: Restrict access based on HTTP methods (GET, POST, PUT, DELETE, PATCH, etc.)
 - **URL Pattern Matching**: Support for regex patterns to match request URLs
 - **Per-Site Configuration**: Configure user proxy rules on a per-site/host basis
