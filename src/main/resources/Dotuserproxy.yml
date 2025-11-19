@@ -1,6 +1,6 @@
 ---
 name: "User Proxy"
-description: "This allows you to set an API Token that will be appended to an incoming request (if one is not provided).  It can be used to allow for public access to specific APIs.  It uses a glob matching pattern to intercept the incoming requests."  
+description: "This allows you to set a User API Token that will be added to an incoming request (if one is not provided). It can be used to selectively allow for public access to specific APIs.  It uses regex patterns to match/intercept the incoming request (both request URI and querystring can be matched, e.g. `/api/v1/content/_search?sortOrder=modDatet&limit=100`) and will validate the request against the token's IP range and sign the request with the token's user."
 iconUrl: "https://static.dotcms.com/assets/icons/apps/api-proxy.png"
 allowExtraParameters: false
 params:
@@ -13,25 +13,25 @@ params:
         hint: |
             Below is an example configuration:
               ```
-              {
+                {
                   "config": [
-                      {
-                          "userToken": "api-user-token-0xZjQ....",
-                          "methods": "GET,POST,HEAD,OPTIONS",
-                          "urls": [
-                              "/api/v1/page/json*",
-                              "/api/v1/content/_search*",
-                              "/api/v1/graphql/*",
-                          ]
-                      },
-                      {
-                          "userToken": "page-user-token-7gf16....",
-                          "methods": "GET",
-                          "urls": [
-                              "/pages/protected/*"
-                          ]
-                      }
+                    {
+                      "userToken": "api-user-token-0xZjQ....",
+                      "methods": "GET,POST,HEAD,OPTIONS",
+                      "urls": [
+                        "/api/v1/page/json*",
+                        "/api/v1/content/_search*",
+                        "/api/v1/graphql/*",
+                      ]
+                    },
+                    {
+                      "userToken": "page-user-token-7gf16....",
+                      "methods": "GET",
+                      "urls": [
+                        "/pages/protected/*"
+                      ]
+                    }
                   ]
-              }
+                }
 
               ```

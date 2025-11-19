@@ -1,25 +1,25 @@
 package com.dotcms.userproxy.model;
 
+import com.dotcms.security.apps.AppSecrets;
+import com.dotcms.userproxy.util.AppKey;
+import com.dotmarketing.beans.Host;
+import com.dotmarketing.business.APILocator;
+import com.dotmarketing.util.Logger;
+import com.dotmarketing.util.UtilMethods;
+import com.dotmarketing.util.VelocityUtil;
+import com.dotmarketing.util.json.JSONObject;
+import io.vavr.control.Try;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import com.dotcms.security.apps.AppSecrets;
-import com.dotcms.userproxy.util.AppKey;
-import com.dotmarketing.beans.Host;
-import com.dotmarketing.business.APILocator;
-import com.dotmarketing.util.Logger;
-import com.dotmarketing.util.json.JSONObject;
-
-import io.vavr.control.Try;
+import org.apache.velocity.context.Context;
 
 /**
- * Mapper for converting JSON configuration entries to UserProxyEntry objects.
- * Handles parsing of userproxy.json and transformation to immutable
- * UserProxyEntry instances.
+ * Mapper for converting JSON configuration entries to UserProxyEntry objects. Handles parsing of userproxy.json and
+ * transformation to immutable UserProxyEntry instances.
  */
 public class UserProxyEntryMapper {
 
@@ -74,15 +74,42 @@ public class UserProxyEntryMapper {
     }
 
     static List<UserProxyEntry> mapUserProxyEntry(Host host) {
-        Optional<AppSecrets> secret = Try
+        Optional<AppSecrets> secrets = Try
                 .of(() -> APILocator.getAppsAPI().getSecrets(AppKey.USER_PROXY_APP_VALUE.appValue,
                         host, APILocator.systemUser()))
                 .get();
-        if (secret.isEmpty()) {
+        if (secrets.isEmpty()) {
             return List.of();
         }
-        String config = secret.get().getSecrets().get(AppKey.APP_CONFIG_KEY.appValue).getString();
-        return parseJsonToEntries(config);
+
+        Optional<String> parsedConfig = secretsToJson(secrets.get());
+        if (parsedConfig.isEmpty()) {
+            return List.of();
+        }
+        return parseJsonToEntries(parsedConfig.get());
 
     }
+
+    private static Optional<String> secretsToJson(AppSecrets secrets) {
+        String config = secrets.getSecrets().get(AppKey.APP_CONFIG_KEY.appValue).getString();
+        if (UtilMethods.isEmpty(config)) {
+            return Optional.empty();
+        }
+        Map<String, String> tokens = new HashMap<>();
+        secrets.getSecrets().entrySet().stream().filter(entry -> entry.getKey().startsWith("token"))
+                .forEach(entry -> {
+                    Object value = entry.getValue();
+
+                    tokens.put(entry.getKey(), new String(entry.getValue().getValue()));
+                });
+        for (Map.Entry<String, String> token : tokens.entrySet()) {
+            config = config.replace("{" + token.getKey() + "}", token.getValue());
+        }
+
+        return Optional.of(config);
+
+
+    }
+
+
 }
