@@ -12,19 +12,19 @@ import com.dotmarketing.portlets.folders.model.Folder;
 import com.dotmarketing.util.ConfigUtils;
 import com.dotmarketing.util.Logger;
 import com.dotmarketing.util.UtilMethods;
-import common.Assert;
 import io.vavr.control.Try;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.IOUtils;
+import org.osgi.framework.BundleContext;
 
 public class FileMoverUtil {
 
@@ -40,7 +40,7 @@ public class FileMoverUtil {
 
     };
 
-    public static List<JarEntry> listFilesInPackage(@Nonnull String packagePathStr) {
+    public static List<JarEntry> listFilesInPackage(String packagePathStr) {
 
         String packagePath = stripPackagePath(packagePathStr);
         List<JarEntry> jarEntries = new ArrayList<>();
@@ -66,7 +66,7 @@ public class FileMoverUtil {
         return jarEntries;
     }
 
-    public static Map<String, String> loadGQLQueryMap(@Nonnull String packagePathStr) {
+    public static Map<String, String> loadGQLQueryMap(String packagePathStr) {
 
         return Map.of();
     }
@@ -78,7 +78,7 @@ public class FileMoverUtil {
      *
      * @param packagePathInJar - the directory path in the jar to copy
      */
-    void copyFromJar(@Nonnull String packagePathInJar) {
+    void copyFromJar(String packagePathInJar) {
         this.copyFromJar(packagePathInJar,
                 Try.of(() -> APILocator.getHostAPI().findDefaultHost(APILocator.systemUser(), false))
                         .getOrElseThrow(DotRuntimeException::new));
@@ -102,7 +102,7 @@ public class FileMoverUtil {
      * @param packagePathInJar - the directory path in the jar to copy
      * @param site             - the site to copy to
      */
-    void copyFromJar(@Nonnull String packagePathInJar, @Nonnull Host site) {
+    void copyFromJar(String packagePathInJar, Host site) {
 
         String strippedPackagePath = stripPackagePath(packagePathInJar);
 
@@ -173,8 +173,9 @@ public class FileMoverUtil {
                 dotfile.setProperty(Contentlet.DISABLE_WORKFLOW, true);
 
                 APILocator.getContentletAPI().publish(dotfile, APILocator.systemUser(), false);
-                Assert.verify(dotfile != null && dotfile.getIdentifier() != null,
-                        "Unable to create file asset: " + fileName);
+                if (dotfile == null || dotfile.getIdentifier() == null) {
+                    throw new DotRuntimeException("Unable to create file asset: " + fileName);
+                }
                 tmpFile.delete();
                 tmpDir.delete();
 
@@ -191,11 +192,15 @@ public class FileMoverUtil {
      *
      * @throws IOException
      */
-    public void copyAppYml() throws IOException {
+    public void copyAppYml(BundleContext context) throws IOException {
 
         Logger.info(this.getClass().getName(), "copying YAML File:" + installedAppYaml);
-        try (final InputStream in = this.getClass()
-                .getResourceAsStream("/" + AppKey.USER_PROXY_APP_VALUE.appValue + ".yml")) {
+        final String entryName = AppKey.USER_PROXY_APP_VALUE.appValue + ".yml";
+        final URL entry = context.getBundle().getEntry("/" + entryName);
+        if (entry == null) {
+            throw new IOException("Bundle entry not found: /" + entryName);
+        }
+        try (final InputStream in = entry.openStream()) {
             IOUtils.copy(in, Files.newOutputStream(installedAppYaml.toPath()));
         }
         CacheLocator.getAppsCache().clearCache();

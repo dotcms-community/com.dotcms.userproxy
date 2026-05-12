@@ -1,12 +1,8 @@
 package com.dotcms.userproxy.interceptor;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
@@ -21,11 +17,11 @@ import com.dotcms.userproxy.model.UserProxyEntryMapper;
 import com.dotmarketing.beans.Host;
 import com.dotmarketing.business.APILocator;
 import com.dotmarketing.business.web.WebAPILocator;
+import com.dotmarketing.util.Logger;
 import com.liferay.portal.model.User;
 import com.liferay.portal.util.PortalUtil;
 import com.liferay.portal.util.WebKeys;
 
-import io.vavr.Lazy;
 import io.vavr.control.Try;
 
 /**
@@ -35,14 +31,7 @@ import io.vavr.control.Try;
  */
 public class UserProxyInterceptor implements WebInterceptor {
 
-    private static final ConcurrentHashMap<String, List<UserProxyEntry>> lazyUserProxyMap = new ConcurrentHashMap<>();
-
     public UserProxyInterceptor() {
-        resetLazyUserProxyMap();
-    }
-
-    public static void resetLazyUserProxyMap() {
-        lazyUserProxyMap.clear();
     }
 
     @Override
@@ -54,32 +43,64 @@ public class UserProxyInterceptor implements WebInterceptor {
     public Result intercept(final HttpServletRequest request, final HttpServletResponse response) {
 
         if (hasExistingAuth(request)) {
+            Logger.debug(this, () -> "UserProxy skip: request already has auth. method="
+                    + request.getMethod() + " uri=" + request.getRequestURI());
             return Result.NEXT;
         }
 
         Host host = WebAPILocator.getHostWebAPI().getCurrentHostNoThrow(request);
+        if (host == null) {
+            Logger.warn(this, "UserProxy could not resolve current host. method="
+                    + request.getMethod() + " uri=" + request.getRequestURI());
+            return Result.NEXT;
+        }
 
-        List<UserProxyEntry> entries = lazyUserProxyMap.computeIfAbsent(host.getIdentifier(),
-                h -> UserProxyEntryMapper.buildListForHost(h));
+        List<UserProxyEntry> entries = UserProxyEntryMapper.buildListForHost(host.getIdentifier());
+
+        Logger.info(this, "UserProxy intercept: method=" + request.getMethod()
+                + " uri=" + request.getRequestURI()
+                + " remoteAddr=" + request.getRemoteAddr()
+                + " hostId=" + host.getIdentifier()
+                + " entries=" + entries.size());
 
         if (entries.isEmpty()) {
+            Logger.warn(this, "UserProxy found no entries for hostId=" + host.getIdentifier()
+                    + " uri=" + request.getRequestURI());
             return Result.NEXT;
         }
 
         // break on first match
         for (UserProxyEntry entry : entries) {
             if (entry.matches(request)) {
+                Logger.info(this, "UserProxy matched entry for method=" + request.getMethod()
+                        + " uri=" + request.getRequestURI()
+                        + " allowedMethods=" + entry.getMethods()
+                        + " patterns=" + Arrays.toString(entry.getUrls()));
+
                 final Optional<JWToken> token = APILocator.getApiTokenAPI()
                         .fromJwt(new String(entry.getUserToken()),
                                 request.getRemoteAddr());
 
+                Logger.info(this, "UserProxy token lookup result for uri="
+                        + request.getRequestURI() + ": tokenPresent=" + token.isPresent());
+
                 User user = Try.of(() -> token.get().getActiveUser().get()).getOrNull();
 
                 if (user != null) {
+                    Logger.info(this, "UserProxy authenticated userId=" + user.getUserId()
+                            + " for uri=" + request.getRequestURI());
                     request.setAttribute(WebKeys.USER, user);
                     request.setAttribute(WebKeys.USER_ID, user.getUserId());
                     break;
                 }
+
+                Logger.warn(this, "UserProxy match did not resolve an active user for uri="
+                        + request.getRequestURI() + " remoteAddr=" + request.getRemoteAddr());
+            } else {
+                Logger.debug(this, () -> "UserProxy entry did not match. method="
+                        + request.getMethod() + " uri=" + request.getRequestURI()
+                        + " allowedMethods=" + entry.getMethods()
+                        + " patterns=" + Arrays.toString(entry.getUrls()));
             }
         }
 

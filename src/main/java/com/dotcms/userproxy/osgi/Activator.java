@@ -34,7 +34,7 @@ public class Activator extends GenericBundleActivator {
 
         // Adding APP yaml
         Logger.info(Activator.class.getName(), "Copying UserProxy APP");
-        new FileMoverUtil().copyAppYml();
+        new FileMoverUtil().copyAppYml(context);
 
 
         // set up app listener

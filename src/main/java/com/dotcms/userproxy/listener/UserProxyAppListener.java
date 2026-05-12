@@ -1,13 +1,9 @@
 package com.dotcms.userproxy.listener;
 
-import com.dotcms.api.system.event.message.MessageSeverity;
-import com.dotcms.api.system.event.message.SystemMessageEventUtil;
-import com.dotcms.api.system.event.message.builder.SystemMessageBuilder;
 import com.dotcms.security.apps.AppSecretSavedEvent;
 
 import com.dotcms.system.event.local.model.EventSubscriber;
 import com.dotcms.system.event.local.model.KeyFilterable;
-import com.dotcms.userproxy.interceptor.UserProxyInterceptor;
 import com.dotcms.userproxy.model.UserProxyEntry;
 import com.dotcms.userproxy.model.UserProxyEntryMapper;
 import com.dotcms.userproxy.util.AppKey;
@@ -44,8 +40,7 @@ public final class UserProxyAppListener implements EventSubscriber<AppSecretSave
             Logger.info(this, "Missing event, aborting");
             return;
         }
-        Logger.info(this, "UserProxyAppListener updated, clearing UserProxy map");
-        UserProxyInterceptor.resetLazyUserProxyMap();
+        Logger.info(this, "UserProxyAppListener received AppSecretSavedEvent");
 
         String jsonConfig = event.getAppSecrets().getSecrets().get(AppKey.APP_CONFIG_KEY.appValue).getString();
 
@@ -61,25 +56,9 @@ public final class UserProxyAppListener implements EventSubscriber<AppSecretSave
             return;
         }
         List<UserProxyEntry> entries = UserProxyEntryMapper.parseJsonToEntries(jsonConfig);
-        if (!entries.isEmpty()) {
-            return;
+        if (entries.isEmpty()) {
+            Logger.warn(this, "No valid User Proxy configuration found for users: " + users);
         }
-        final SystemMessageBuilder systemMessageBuilder = new SystemMessageBuilder();
-        String velocityMessage = "No valid User Proxy  configuration found.";
-
-        MessageSeverity severity = (false)
-                ? MessageSeverity.INFO
-                : MessageSeverity.ERROR;
-
-        systemMessageBuilder.setMessage(velocityMessage)
-                .setLife(7 * 1000)
-                .setSeverity(severity).create();
-
-        SystemMessageEventUtil.getInstance().pushMessage(systemMessageBuilder.create(), users);
-
-
-
-
 
 
 
