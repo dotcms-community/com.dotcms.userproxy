@@ -107,7 +107,7 @@ public final class UserProxyEntry {
     public String toString() {
 
         return "UserProxyEntry{" +
-                "userToken=" + (userToken != null ? "***" : "null") +
+                "userToken=***" +
                 ", methods=" + methods.toString() +
                 ", urls=" + java.util.Arrays.toString(urls) +
                 '}';

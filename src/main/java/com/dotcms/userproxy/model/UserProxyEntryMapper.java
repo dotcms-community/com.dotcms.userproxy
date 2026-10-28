@@ -7,6 +7,8 @@ import com.dotmarketing.business.APILocator;
 import com.dotmarketing.util.Logger;
 import com.dotmarketing.util.UtilMethods;
 import com.dotmarketing.util.json.JSONObject;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import io.vavr.control.Try;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Mapper for converting app JSON configuration to UserProxyEntry objects. Handles parsing and
@@ -26,7 +29,13 @@ public class UserProxyEntryMapper {
     private static final String METHODS_KEY = "methods";
     private static final String URLS_KEY = "urls";
 
-    UserProxyEntryMapper() {
+    // Cache by resolved content, not AppSecrets identity, so Apps API updates and deletions remain authoritative.
+    private static final LoadingCache<String, List<UserProxyEntry>> parsedEntries = Caffeine.newBuilder()
+            .maximumSize(100)
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .build(UserProxyEntryMapper::parseJsonToEntries);
+
+    private UserProxyEntryMapper() {
     }
 
     /**
@@ -79,7 +88,7 @@ public class UserProxyEntryMapper {
         if (parsedConfig.isEmpty()) {
             return List.of();
         }
-        return parseJsonToEntries(parsedConfig.get());
+        return parsedEntries.get(parsedConfig.get());
 
     }
 

@@ -71,7 +71,8 @@
                         <Bundle-DocURL>https://www.dotcms.com/</Bundle-DocURL>
                         <Bundle-Activator>com.dotcms.userproxy.osgi.Activator</Bundle-Activator>
                         <Bundle-ClassPath>.,{maven-dependencies}</Bundle-ClassPath>
-                        <Import-Package>*</Import-Package>
+                        <!-- dotCMS exposes server libraries as system packages without matching library versions. -->
+                        <Import-Package>*;version="0"</Import-Package>
                         <Export-Package>!*</Export-Package>
                         <Private-Package>com.dotcms.userproxy.*</Private-Package>
                         <Embed-Dependency>*;scope=compile|runtime</Embed-Dependency>

@@ -19,7 +19,7 @@ params:
                       "userToken": "api-user-token-0xZjQ....",
                       "methods": "GET,POST,HEAD,OPTIONS",
                       "urls": [
-                        "/api/v1/page/json/.*",
+                        "/api/v1/page/json(/.*)?",
                         "/api/v1/content/_search",
                         "/api/v1/graphql"
                       ]

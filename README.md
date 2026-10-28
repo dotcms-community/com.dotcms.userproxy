@@ -24,7 +24,7 @@ The User Proxy Plugin is a web interceptor-based solution for dotCMS that interc
 
 ## Installation
 
-Build the plugin from source using the steps below.
+[Download the pre-built bundle](target/userproxy-26.10.28-02.jar?raw=true), or build it from source using the steps below. Only the current bundle is kept in this repository.
 
 
 
@@ -47,9 +47,9 @@ target/userproxy-26.10.28-02.jar
 
 ### Deploying to dotCMS
 
-1. Copy the generated JAR file to your dotCMS dynamic plugin directory (remove any older User Proxy bundle first):
+1. Upload the JAR through the dotCMS Dynamic Plugins UI, or copy it to the upload directory so dotCMS can register imported server packages (remove any older User Proxy bundle first):
    ```bash
-   cp target/userproxy-26.10.28-02.jar /path/to/dotcms/felix/load/
+   cp target/userproxy-26.10.28-02.jar /path/to/dotcms/felix/upload/
    ```
 
 2. Start or restart dotCMS. The plugin will automatically:
@@ -65,7 +65,7 @@ target/userproxy-26.10.28-02.jar
 
 ## Configuration
 
-Configure rules in the **User Proxy / Anonymous Access** app for each site. Rules are evaluated in order; the first matching rule with a valid token supplies the request user. If no site rule authenticates the request, System Host rules are tried. Configuration is read through the dotCMS Apps API cache, so saves and deletions use dotCMS cluster invalidation; each node reloads its own values.
+Configure rules in the **User Proxy / Anonymous Access** app for each site. Rules are evaluated in order; the first matching rule with a valid token supplies the request user. If no site rule authenticates the request, System Host rules are tried. Configuration is read through the dotCMS Apps API cache, so saves and deletions use dotCMS cluster invalidation; each node reloads its own values. Parsed rules and compiled patterns are reused in a node-local Caffeine cache keyed by the resolved configuration content, bounded to 100 configurations with a 10-minute idle expiry. Each request still reads the current Apps API configuration before selecting cached rules.
 
 **Security:** Matching endpoints become publicly accessible with the token user's permissions. Use a least-privilege service account and narrow paths and methods. Keep configured regexes simple to avoid expensive matching on every request.
 
@@ -80,7 +80,7 @@ Configure rules in the **User Proxy / Anonymous Access** app for each site. Rule
                 "userToken": "api-user-token-0xZjQ....",
                 "methods": "GET,POST,HEAD,OPTIONS",
                 "urls": [
-                    "/api/v1/page/json/.*",
+                    "/api/v1/page/json(/.*)?",
                     "/api/v1/content/_search",
                     "/api/v1/graphql"
                 ]
@@ -408,7 +408,7 @@ For issues, questions, or contributions:
 ### v26.10.28-02
 - Updated to dotCMS 26.10.28-02 and Java 25
 - Restored request user assignment and System Host fallback
-- Reused dotCMS Apps API caching instead of a separate versioned cache
+- Reused dotCMS Apps API caching instead of a separate versioned cache, with bounded content-keyed Caffeine caching for parsed rules
 - Restricted rules to full-path regex matching and corrected examples
 - Fixed resource copying, missing configuration handling, and malformed-JSON logging
 - Added authentication and path-matching regression tests
