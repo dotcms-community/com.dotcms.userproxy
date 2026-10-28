@@ -6,7 +6,6 @@ import com.dotmarketing.beans.Host;
 import com.dotmarketing.business.APILocator;
 import com.dotmarketing.util.Logger;
 import com.dotmarketing.util.UtilMethods;
-import com.dotmarketing.util.VelocityUtil;
 import com.dotmarketing.util.json.JSONObject;
 import io.vavr.control.Try;
 import java.util.ArrayList;
@@ -15,10 +14,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.velocity.context.Context;
 
 /**
- * Mapper for converting JSON configuration entries to UserProxyEntry objects. Handles parsing of userproxy.json and
+ * Mapper for converting app JSON configuration to UserProxyEntry objects. Handles parsing and
  * transformation to immutable UserProxyEntry instances.
  */
 public class UserProxyEntryMapper {
@@ -51,7 +49,7 @@ public class UserProxyEntryMapper {
             }
             return Collections.unmodifiableList(entries);
         } catch (Exception e) {
-            Logger.warn(UserProxyEntryMapper.class, "unable to parse json:" + e);
+            Logger.warn(UserProxyEntryMapper.class, "Unable to parse User Proxy configuration; no rules loaded.");
             return List.of();
         }
     }
@@ -60,12 +58,7 @@ public class UserProxyEntryMapper {
         try {
             Host host = APILocator.getHostAPI().find(hostIdentifier, APILocator.getUserAPI().getSystemUser(), false);
 
-            List<UserProxyEntry> entries = mapUserProxyEntry(host);
-            if (!entries.isEmpty()) {
-                return entries;
-            }
-
-            return mapUserProxyEntry(APILocator.systemHost());
+            return host == null ? List.of() : mapUserProxyEntry(host);
 
         } catch (Exception e) {
             Logger.warnAndDebug(UserProxyEntryMapper.class, "error building user proxy map:" + e.getMessage(), e);
@@ -91,6 +84,9 @@ public class UserProxyEntryMapper {
     }
 
     private static Optional<String> secretsToJson(AppSecrets secrets) {
+        if (!secrets.getSecrets().containsKey(AppKey.APP_CONFIG_KEY.appValue)) {
+            return Optional.empty();
+        }
         String config = secrets.getSecrets().get(AppKey.APP_CONFIG_KEY.appValue).getString();
         if (UtilMethods.isEmpty(config)) {
             return Optional.empty();
@@ -98,8 +94,6 @@ public class UserProxyEntryMapper {
         Map<String, String> tokens = new HashMap<>();
         secrets.getSecrets().entrySet().stream().filter(entry -> entry.getKey().startsWith("token"))
                 .forEach(entry -> {
-                    Object value = entry.getValue();
-
                     tokens.put(entry.getKey(), new String(entry.getValue().getValue()));
                 });
         for (Map.Entry<String, String> token : tokens.entrySet()) {

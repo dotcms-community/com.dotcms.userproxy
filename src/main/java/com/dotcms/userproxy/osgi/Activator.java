@@ -26,11 +26,10 @@ public class Activator extends GenericBundleActivator {
     final LocalSystemEventsAPI localSystemEventsAPI = APILocator.getLocalSystemEventsAPI();
     private final UserProxyAppListener appListener = new UserProxyAppListener();
 
-    public void start(final org.osgi.framework.BundleContext context) throws IOException {
+    @Override
+    public void start(final BundleContext context) throws IOException {
 
         Logger.info(Activator.class.getName(), "Starting UserProxy Plugin");
-
-        delegate.addFirst(interceptor);
 
         // Adding APP yaml
         Logger.info(Activator.class.getName(), "Copying UserProxy APP");
@@ -40,6 +39,7 @@ public class Activator extends GenericBundleActivator {
         // set up app listener
         Logger.info(Activator.class.getName(), "Starting App Listener");
         localSystemEventsAPI.subscribe(AppSecretSavedEvent.class, appListener);
+        delegate.addFirst(interceptor);
     }
 
     @Override
@@ -51,8 +51,8 @@ public class Activator extends GenericBundleActivator {
         delegate.remove(interceptor.getName(), true);
 
         Logger.info(Activator.class.getName(), "Removing UserProxy App");
-        new FileMoverUtil().deleteYml();
         localSystemEventsAPI.unsubscribe(appListener);
+        new FileMoverUtil().deleteYml();
     }
 
 }
