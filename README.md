@@ -24,17 +24,15 @@ The User Proxy Plugin is a web interceptor-based solution for dotCMS that interc
 
 ## Installation
 
-Download the pre-built plugin:
-
-https://github.com/dotcms-community/com.dotcms.userproxy/blob/main/target/userproxy-25.10.05.jar
+[Download the pre-built bundle](target/userproxy-26.10.28-02.jar?raw=true), or build it from source using the steps below. Only the current bundle is kept in this repository.
 
 
 
 ### Prerequisites
 
-- dotCMS 25.10.03 or later
-- Java 11 or later
-- Maven 3.6+
+- dotCMS [26.10.28-02](https://github.com/dotCMS/core/releases/tag/v26.10.28-02) (latest stable release verified on 2026-10-28)
+- Java 25 (matching this dotCMS release)
+- Maven 3.9+ (the included wrapper uses 3.9.9)
 
 ### Building the Plugin
 
@@ -44,14 +42,14 @@ https://github.com/dotcms-community/com.dotcms.userproxy/blob/main/target/userpr
 
 This will create an OSGi bundle JAR file in the `target/` directory:
 ```
-target/userproxy-25.10.05.jar
+target/userproxy-26.10.28-02.jar
 ```
 
 ### Deploying to dotCMS
 
-1. Copy the generated JAR file to your dotCMS plugins directory:
+1. Upload the JAR through the dotCMS Dynamic Plugins UI, or copy it to the upload directory so dotCMS can register imported server packages (remove any older User Proxy bundle first):
    ```bash
-   cp target/userproxy-25.10.05.jar /path/to/dotcms/plugins/
+   cp target/userproxy-26.10.28-02.jar /path/to/dotcms/felix/upload/
    ```
 
 2. Start or restart dotCMS. The plugin will automatically:
@@ -67,7 +65,11 @@ target/userproxy-25.10.05.jar
 
 ## Configuration
 
-User proxy rules are configured by using the User Proxy App.  This simple app takes a json object to configure the user to proxy and will automatically load the configurations for each site.  You can specify multiple paths and tokens per site - though only the first match will be returned. Additionally, if the specific site is not configured, the plugin will look for a fall back configuration from the System Host.
+Configure rules in the **User Proxy / Anonymous Access** app for each site. Rules are evaluated in order; the first matching rule with a valid token supplies the request user. If no site rule authenticates the request, System Host rules are tried. Configuration is read through the dotCMS Apps API cache, so saves and deletions use dotCMS cluster invalidation; each node reloads its own values. Parsed rules and compiled patterns are reused in a node-local Caffeine cache keyed by the resolved configuration content, bounded to 100 configurations with a 10-minute idle expiry. Each request still reads the current Apps API configuration before selecting cached rules.
+
+**Security:** Matching endpoints become publicly accessible with the token user's permissions. Use a least-privilege service account and narrow paths and methods. Keep configured regexes simple to avoid expensive matching on every request.
+
+**Upgrade note:** URL patterns now match the **entire request path**, not a substring. Use `/pages/protected/.*` for subpaths, not the glob `/pages/protected/*`. Query strings are not matched. This release targets Java 25 and is not compatible with older Java runtimes.
 
 ### Configuration Format
 
@@ -78,16 +80,16 @@ User proxy rules are configured by using the User Proxy App.  This simple app ta
                 "userToken": "api-user-token-0xZjQ....",
                 "methods": "GET,POST,HEAD,OPTIONS",
                 "urls": [
-                    "/api/v1/page/json*",
-                    "/api/v1/content/_search*",
-                    "/api/v1/graphql/*",
+                    "/api/v1/page/json(/.*)?",
+                    "/api/v1/content/_search",
+                    "/api/v1/graphql"
                 ]
             },
             {
                 "userToken": "page-user-token-7gf16....",
                 "methods": "GET",
                 "urls": [
-                    "/pages/protected/*"
+                    "/pages/protected/.*"
                 ]
             }
         ]
@@ -100,7 +102,7 @@ User proxy rules are configured by using the User Proxy App.  This simple app ta
 |-----------|------|-------------|
 | `userToken` | String | JWT token associated with a dotCMS user. This token is used to authenticate requests. |
 | `methods` | String | Comma-separated list of allowed HTTP methods (case-insensitive). Example: `"GET,POST,PUT"` |
-| `urls` | Array[String] | Array of regex patterns that match the request URI paths. The interceptor uses regex matching. |
+| `urls` | Array[String] | Regular expressions matched against the entire request URI path, excluding the query string. |
 
 ### Example Configurations
 
@@ -188,7 +190,7 @@ While this plugin is designed for token-based configuration, requests can also u
 - Implements `WebInterceptor` interface
 - Intercepts all HTTP requests (`/*`)
 - Performs request validation and user assignment
-- Manages lazy-loaded configuration cache per host
+- Reads per-host configuration through the dotCMS Apps API cache
 
 #### 3. **UserProxyEntry** (`com.dotcms.userproxy.model.UserProxyEntry`)
 - Immutable configuration model
@@ -202,7 +204,7 @@ While this plugin is designed for token-based configuration, requests can also u
 #### 5. **FileMoverUtil** (`com.dotcms.userproxy.osgi.FileMoverUtil`)
 - Copies plugin resources to dotCMS
 - Manages app YAML configuration files
-- Handles file asset creation from JAR resources
+- Creates the apps directory when needed and closes copied resources
 
 ### Request Flow Diagram
 
@@ -287,11 +289,13 @@ Run unit tests:
 ./mvnw test
 ```
 
-Run integration tests:
+Run all checks and package the bundle:
 
 ```bash
 ./mvnw verify
 ```
+
+There are no live-server integration tests. Before production, deploy to staging and verify authentication, System Host fallback, configuration updates/deletions across nodes, and bundle stop/start.
 
 ### Code Quality
 
@@ -306,18 +310,17 @@ The plugin follows dotCMS conventions:
 
 ### Core Dependencies
 
-- **dotcms-core** (25.10.03-01) - dotCMS core API and framework
-- **maven-bundle-plugin** (5.1.9) - OSGi bundle packaging
-- **aspectj** (1.8.10) - Aspect-oriented programming support
+- **dotcms-core** (26.10.28-02) - dotCMS core API and framework (provided by the server)
+- **maven-bundle-plugin** (6.2.0) - OSGi bundle packaging
 
 ### Test Dependencies
 
 - **JUnit 5** (5.12.2) - Testing framework
-- **Mockito** (5.17.0) - Mocking framework
+- **Mockito** (5.24.0) - Mocking framework with Java 25 support
 
 ### Runtime Dependencies
 
-Dependencies are embedded in the bundle JAR file during build.
+Runtime APIs are provided by dotCMS, not embedded in the plugin bundle.
 
 ## Troubleshooting
 
@@ -327,7 +330,7 @@ Dependencies are embedded in the bundle JAR file during build.
 
 **Solutions**:
 - Check dotCMS logs for startup errors
-- Verify Java version is 11 or later
+- Verify Java version is 25
 - Ensure JAR file is in the correct plugins directory
 - Check that all required dotCMS core APIs are available
 
@@ -336,7 +339,7 @@ Dependencies are embedded in the bundle JAR file during build.
 **Problem**: Requests are not being matched against user proxy rules.
 
 **Solutions**:
-- Verify configuration file exists in `/path/to/dotcms/apps/userproxy.json`
+- Verify the site or System Host has a configuration in the User Proxy app
 - Check that URL patterns are valid regex expressions
 - Ensure user token is correctly formatted and valid
 - Verify HTTP method matches (case-insensitive)
@@ -354,12 +357,12 @@ Dependencies are embedded in the bundle JAR file during build.
 
 ### Configuration Not Updating
 
-**Problem**: Changes to userproxy.json are not reflected.
+**Problem**: App configuration changes are not reflected.
 
 **Solutions**:
-- Restart the dotCMS instance
-- Or trigger app cache refresh through dotCMS admin UI
-- Verify file is valid JSON format
+- Save valid JSON in the User Proxy app for the correct site
+- Check System Host rules if deleted site rules still appear to grant access
+- Verify dotCMS cache invalidations reach all cluster nodes
 
 ## Logging
 
@@ -402,6 +405,14 @@ For issues, questions, or contributions:
 
 ## Version History
 
+### v26.10.28-02
+- Updated to dotCMS 26.10.28-02 and Java 25
+- Restored request user assignment and System Host fallback
+- Reused dotCMS Apps API caching instead of a separate versioned cache, with bounded content-keyed Caffeine caching for parsed rules
+- Restricted rules to full-path regex matching and corrected examples
+- Fixed resource copying, missing configuration handling, and malformed-JSON logging
+- Added authentication and path-matching regression tests
+
 ### v25.10.05
 - Initial release
 - Core user proxy authentication functionality
@@ -413,5 +424,5 @@ For issues, questions, or contributions:
 
 - [dotCMS Official Documentation](https://www.dotcms.com/docs)
 - [dotCMS OSGi Plugin Development](https://www.dotcms.com/docs/latest/osgi-plugins)
-- [Jakarta Servlet API](https://jakarta.ee/specifications/servlet/)
+- [Servlet 3.1 API](https://javaee.github.io/javaee-spec/javadocs/javax/servlet/package-summary.html) (dotCMS still uses `javax.servlet`)
 - [OSGi Framework Specification](https://osgi.org/specification/)

@@ -3,6 +3,7 @@ package com.dotcms.userproxy.model;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
@@ -28,7 +29,9 @@ public final class UserProxyEntry {
      */
     public UserProxyEntry(final String userToken, final String methods, final String[] urls) {
         this.userToken = userToken != null ? userToken.toCharArray() : new char[0];
-        this.methods = methods != null ? Arrays.asList(methods.toLowerCase().split("\\s*,\\s*", -1)) : List.of();
+        this.methods = methods != null
+                ? List.copyOf(Arrays.asList(methods.trim().toLowerCase(Locale.ROOT).split("\\s*,\\s*", -1)))
+                : List.of();
         this.urls = stringsToPatterns(urls);
     }
 
@@ -72,7 +75,7 @@ public final class UserProxyEntry {
      * @return a copy of the URLs array
      */
     public Pattern[] getUrls() {
-        return urls;
+        return urls.clone();
     }
 
     /**
@@ -83,7 +86,7 @@ public final class UserProxyEntry {
      */
     public boolean matches(final HttpServletRequest request) {
         String url = request.getRequestURI();
-        String method = request.getMethod().toLowerCase();
+        String method = request.getMethod().toLowerCase(Locale.ROOT);
 
         // Check if method matches (case-insensitive)
         if (!methods.contains(method)) {
@@ -92,7 +95,7 @@ public final class UserProxyEntry {
 
         // Check if URL matches any pattern
         for (Pattern p : urls) {
-            if (p.matcher(url).find()) {
+            if (p.matcher(url).matches()) {
                 return true;
             }
         }
@@ -104,7 +107,7 @@ public final class UserProxyEntry {
     public String toString() {
 
         return "UserProxyEntry{" +
-                "userToken=" + (userToken != null ? "***" : "null") +
+                "userToken=***" +
                 ", methods=" + methods.toString() +
                 ", urls=" + java.util.Arrays.toString(urls) +
                 '}';
