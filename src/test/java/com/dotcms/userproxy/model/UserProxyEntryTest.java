@@ -28,15 +28,44 @@ class UserProxyEntryTest {
     }
 
     @Test
-    void supportsExplicitSubpathsButDoesNotMatchQueryStrings() {
+    void supportsExplicitSubpaths() {
         UserProxyEntry entry = new UserProxyEntry("token", "GET", new String[]{"/pages/protected/.*"});
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/pages/protected/article");
         assertTrue(entry.matches(request));
+    }
 
-        UserProxyEntry queryRule = new UserProxyEntry("token", "GET", new String[]{"/pages/protected/article\\?public=true"});
-        assertFalse(queryRule.matches(request));
+    @Test
+    void matchesTheWholePathAndRawQueryString() {
+        UserProxyEntry entry = new UserProxyEntry("token", "GET",
+                new String[]{"/pages/protected/article\\?public=true&name=hello%20world"});
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/pages/protected/article");
+        assertFalse(entry.matches(request));
+
+        when(request.getQueryString()).thenReturn("public=true&name=hello%20world");
+        assertTrue(entry.matches(request));
+        UserProxyEntry pathOnly = new UserProxyEntry("token", "GET",
+                new String[]{"/pages/protected/article"});
+        assertFalse(pathOnly.matches(request));
+
+        when(request.getQueryString()).thenReturn("public=false&name=hello%20world");
+        assertFalse(entry.matches(request));
+        when(request.getQueryString()).thenReturn("public=true&name=hello%20world&extra=1");
+        assertFalse(entry.matches(request));
+    }
+
+    @Test
+    void preservesAnEmptyQueryString() {
+        UserProxyEntry entry = new UserProxyEntry("token", "GET", new String[]{"/api\\?"});
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/api");
+        assertFalse(entry.matches(request));
+        when(request.getQueryString()).thenReturn("");
+        assertTrue(entry.matches(request));
     }
 
     @Test

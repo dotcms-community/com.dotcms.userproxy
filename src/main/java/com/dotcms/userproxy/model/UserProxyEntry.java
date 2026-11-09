@@ -79,13 +79,17 @@ public final class UserProxyEntry {
     }
 
     /**
-     * Matches the given request against this entry's methods and URL patterns.
+     * Matches the request method and entire URI, including the raw query string.
      *
      * @param request the HttpServletRequest to match
      * @return true if the request method and URL match this entry's configuration
      */
     public boolean matches(final HttpServletRequest request) {
         String url = request.getRequestURI();
+        String query = request.getQueryString();
+        if (query != null) {
+            url += "?" + query;
+        }
         String method = request.getMethod().toLowerCase(Locale.ROOT);
 
         // Check if method matches (case-insensitive)

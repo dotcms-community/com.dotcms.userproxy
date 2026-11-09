@@ -1,6 +1,6 @@
 ---
 name: "User Proxy / Anonymous Access"
-description: "This allows you to set a User API Token used to authenticate an incoming request if it has no existing authentication. It selectively allows public access to APIs using full-path regular expressions. Query strings are not matched. The token is validated against the client IP address, and its user is assigned to the request."
+description: "This allows you to set a User API Token used to authenticate an incoming request if it has no existing authentication. It selectively allows public access to APIs using regular expressions matched against the entire request URI, including the raw query string. The token is validated against the client IP address, and its user is assigned to the request."
 iconUrl: "https://static.dotcms.com/assets/icons/apps/api-proxy.png"
 allowExtraParameters: false
 params:
@@ -16,6 +16,7 @@ params:
                 {
                   "config": [
                     {
+                      "_comment": "api-user@example.com — public API access",
                       "userToken": "api-user-token-0xZjQ....",
                       "methods": "GET,POST,HEAD,OPTIONS",
                       "urls": [
@@ -25,6 +26,7 @@ params:
                       ]
                     },
                     {
+                      "_comment": "page-user@example.com — read-only access to protected pages",
                       "userToken": "page-user-token-7gf16....",
                       "methods": "GET",
                       "urls": [
