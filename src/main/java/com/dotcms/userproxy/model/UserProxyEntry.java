@@ -16,6 +16,9 @@ import com.dotmarketing.util.Logger;
  */
 public final class UserProxyEntry {
 
+    private static final int MAX_URL_LENGTH = 2048;
+    private static final long MATCH_BUDGET_NANOS = 50_000_000L;
+
     private final char[] userToken;
     private final List<String> methods;
     private final Pattern[] urls;
@@ -93,18 +96,49 @@ public final class UserProxyEntry {
         String method = request.getMethod().toLowerCase(Locale.ROOT);
 
         // Check if method matches (case-insensitive)
-        if (!methods.contains(method)) {
+        if (!methods.contains(method) || url.length() > MAX_URL_LENGTH) {
             return false;
         }
 
-        // Check if URL matches any pattern
+        // Share one deadline across all patterns in this entry.
+        Deadline input = new Deadline(url, System.nanoTime() + MATCH_BUDGET_NANOS);
         for (Pattern p : urls) {
-            if (p.matcher(url).matches()) {
-                return true;
+            try {
+                if (p.matcher(input).matches()) {
+                    return true;
+                }
+            } catch (IllegalStateException e) {
+                Logger.warn(getClass(), "User Proxy regex matching timed out for pattern: " + p);
+                return false;
             }
         }
 
         return false;
+    }
+
+    private record Deadline(CharSequence value, long endNanos) implements CharSequence {
+        @Override
+        public int length() {
+            return value.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (System.nanoTime() - endNanos >= 0) {
+                throw new IllegalStateException("User Proxy regex timeout");
+            }
+            return value.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new Deadline(value.subSequence(start, end), endNanos);
+        }
+
+        @Override
+        public String toString() {
+            return value.toString();
+        }
     }
 
     @Override

@@ -67,7 +67,7 @@ target/userproxy-26.10.28-02.jar
 
 Configure rules in the **User Proxy / Anonymous Access** app for each site. Rules are evaluated in order; the first matching rule with a valid token supplies the request user. If no site rule authenticates the request, System Host rules are tried. Configuration is read through the dotCMS Apps API cache, so saves and deletions use dotCMS cluster invalidation; each node reloads its own values. Parsed rules and compiled patterns are reused in a node-local Caffeine cache keyed by the resolved configuration content, bounded to 100 configurations with a 10-minute idle expiry. Each request still reads the current Apps API configuration before selecting cached rules.
 
-**Security:** Matching endpoints become publicly accessible with the token user's permissions. Use a least-privilege service account and narrow paths and methods. Keep configured regexes simple to avoid expensive matching on every request.
+**Security:** Matching endpoints become publicly accessible with the token user's permissions. Use a least-privilege service account and narrow paths and methods. Keep configured regexes simple: avoid nested quantifiers (such as `(a+)+`) and overlapping alternation. Requests whose path plus raw query string exceeds 2,048 characters do not receive proxy authentication. Matching has a shared 50 ms budget across each entry's patterns; a timeout rejects that entry and logs the configured pattern, never the request URI. Other entries and System Host fallback are still evaluated.
 
 **Upgrade note:** URL patterns now match the **entire request URI, including the raw query string**, not a substring. Use `/pages/protected/.*` for subpaths, not the glob `/pages/protected/*`. Exact-path patterns reject requests with query strings unless the pattern explicitly allows them. This release targets Java 25 and is not compatible with older Java runtimes.
 
@@ -155,7 +155,11 @@ Unused JSON properties (such as `_comment`) are ignored. Use these for documenta
 }
 ```
 
-This matches only `/api/v1/page/json/about-us?language_id=1`. Query parameter order and percent-encoding are preserved; the query is not decoded or reordered. A literal `?` must be escaped as `\?` in regex (`\\?` in JSON). To allow any optional query string on an exact endpoint, use `"/api/v1/graphql(\\?.*)?"` in JSON.
+This matches only `/api/v1/page/json/about-us?language_id=1`. Query parameter order and percent-encoding are preserved; the query is not decoded or reordered. A literal `?` must be escaped as `\?` in regex (`\\?` in JSON).
+
+Prefer exact query patterns like the example above. If any numeric language ID is intended, use `"/api/v1/page/json/about-us\\?language_id=\\d+"` in JSON. Use bounded character classes such as `[^/?&]+` for a single path segment or query value, rather than `.*`. Avoid mid-pattern wildcards: `about-us.*language_id=1` also matches `about-us-private?x=language_id=1`.
+
+**Permissive option:** `"/api/v1/graphql(\\?.*)?"` allows any optional query string without validating its parameters or values. This grants the token user's privileges even for arbitrary `host_id`, `language_id`, `depth`, or GraphQL `query` values; use it only when that unrestricted query access is intentional.
 
 ## Usage
 

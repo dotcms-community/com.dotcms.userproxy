@@ -3,6 +3,8 @@ package com.dotcms.userproxy.model;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.dotmarketing.util.Logger;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
@@ -66,6 +68,40 @@ class UserProxyEntryTest {
         assertFalse(entry.matches(request));
         when(request.getQueryString()).thenReturn("");
         assertTrue(entry.matches(request));
+    }
+
+    @Test
+    void boundsTheCombinedPathAndQueryLength() {
+        UserProxyEntry entry = new UserProxyEntry("token", "GET", new String[]{".*"});
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/" + "a".repeat(2047));
+        assertTrue(entry.matches(request));
+
+        when(request.getRequestURI()).thenReturn("/" + "a".repeat(2048));
+        assertFalse(entry.matches(request));
+
+        when(request.getRequestURI()).thenReturn("/api");
+        when(request.getQueryString()).thenReturn("a".repeat(2043));
+        assertTrue(entry.matches(request));
+        when(request.getQueryString()).thenReturn("a".repeat(2044));
+        assertFalse(entry.matches(request));
+    }
+
+    @Test
+    void timesOutBacktrackingWithoutTryingPermissiveFallbackOrLoggingTheUrl() {
+        String pattern = "/(a+){10}$";
+        UserProxyEntry entry = new UserProxyEntry("token", "GET", new String[]{pattern, ".*"});
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/" + "a".repeat(128) + "!");
+
+        try (var logger = mockStatic(Logger.class)) {
+            assertTimeout(Duration.ofSeconds(2), () -> assertFalse(entry.matches(request)));
+            logger.verify(() -> Logger.warn(UserProxyEntry.class,
+                    "User Proxy regex matching timed out for pattern: " + pattern));
+            logger.verifyNoMoreInteractions();
+        }
     }
 
     @Test
