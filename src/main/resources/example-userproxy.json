@@ -1,6 +1,7 @@
 {
     "config": [
         {
+            "_comment": "api-user@example.com — public API and protected page access",
             "userToken": "api-user-token-0xZjQwMmQ4ZjRhNzMiLCJ4bW9kIjoxNjk2NjEyNzI3M",
             "methods": "GET,POST",
             "urls": [

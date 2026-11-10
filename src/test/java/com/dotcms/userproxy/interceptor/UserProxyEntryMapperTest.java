@@ -60,6 +60,35 @@ class UserProxyEntryMapperTest {
     }
 
     @Test
+    void ignoresCommentProperties() {
+        String json = """
+                {
+                    "_comment": "Service account rules",
+                    "config": [{
+                        "_comment": "dev+bug@dotcms.com — public page access",
+                        "userToken": "test-token",
+                        "methods": "GET",
+                        "urls": ["/api"]
+                    }]
+                }
+                """;
+        List<UserProxyEntry> entries = UserProxyEntryMapper.parseJsonToEntries(json);
+        assertEquals(1, entries.size());
+        assertEquals("test-token", new String(entries.get(0).getUserToken()));
+        assertEquals(List.of("get"), entries.get(0).getMethods());
+        assertEquals("/api", entries.get(0).getUrls()[0].pattern());
+    }
+
+    @Test
+    void rejectsCommentSyntax() {
+        for (String comment : List.of("// Token owner", "/* Token owner */", "# Token owner")) {
+            String json = "{\n" + comment + "\n" +
+                    "\"config\":[{\"userToken\":\"token\",\"methods\":\"GET\",\"urls\":[\"/api\"]}]}";
+            assertTrue(UserProxyEntryMapper.parseJsonToEntries(json).isEmpty(), comment);
+        }
+    }
+
+    @Test
     void testParseJsonWithMultipleMethods() {
         String json = "{\n" +
                 "    \"config\": [\n" +

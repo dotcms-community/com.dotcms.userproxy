@@ -67,9 +67,9 @@ target/userproxy-26.10.28-02.jar
 
 Configure rules in the **User Proxy / Anonymous Access** app for each site. Rules are evaluated in order; the first matching rule with a valid token supplies the request user. If no site rule authenticates the request, System Host rules are tried. Configuration is read through the dotCMS Apps API cache, so saves and deletions use dotCMS cluster invalidation; each node reloads its own values. Parsed rules and compiled patterns are reused in a node-local Caffeine cache keyed by the resolved configuration content, bounded to 100 configurations with a 10-minute idle expiry. Each request still reads the current Apps API configuration before selecting cached rules.
 
-**Security:** Matching endpoints become publicly accessible with the token user's permissions. Use a least-privilege service account and narrow paths and methods. Keep configured regexes simple to avoid expensive matching on every request.
+**Security:** Matching endpoints become publicly accessible with the token user's permissions. Use a least-privilege service account and narrow paths and methods. Keep configured regexes simple: avoid nested quantifiers (such as `(a+)+`) and overlapping alternation. Requests whose path plus raw query string exceeds 2,048 characters do not receive proxy authentication. Matching has a shared 50 ms budget across each entry's patterns; a timeout rejects that entry and logs the configured pattern, never the request URI. Other entries and System Host fallback are still evaluated.
 
-**Upgrade note:** URL patterns now match the **entire request path**, not a substring. Use `/pages/protected/.*` for subpaths, not the glob `/pages/protected/*`. Query strings are not matched. This release targets Java 25 and is not compatible with older Java runtimes.
+**Upgrade note:** URL patterns now match the **entire request URI, including the raw query string**, not a substring. Use `/pages/protected/.*` for subpaths, not the glob `/pages/protected/*`. Exact-path patterns reject requests with query strings unless the pattern explicitly allows them. This release targets Java 25 and is not compatible with older Java runtimes.
 
 ### Configuration Format
 
@@ -102,7 +102,10 @@ Configure rules in the **User Proxy / Anonymous Access** app for each site. Rule
 |-----------|------|-------------|
 | `userToken` | String | JWT token associated with a dotCMS user. This token is used to authenticate requests. |
 | `methods` | String | Comma-separated list of allowed HTTP methods (case-insensitive). Example: `"GET,POST,PUT"` |
-| `urls` | Array[String] | Regular expressions matched against the entire request URI path, excluding the query string. |
+| `urls` | Array[String] | Regular expressions matched against the entire request URI, including the raw query string (when present). |
+| `_comment` | String | Optional note recording the token's user and purpose. Ignored by authentication; not verified against the token. |
+
+Unused JSON properties (such as `_comment`) are ignored. Use these for documentation rather than `//` or `/* ... */` comments, which are not supported.
 
 ### Example Configurations
 
@@ -140,6 +143,24 @@ Configure rules in the **User Proxy / Anonymous Access** app for each site. Rule
 }
 ```
 
+**Query-specific access with a token-owner note:**
+```json
+{
+    "userToken": "token789...",
+    "_comment": "dev+bug@dotcms.com — public access to the About Us page in language 1",
+    "methods": "GET",
+    "urls": [
+        "/api/v1/page/json/about-us\\?language_id=1"
+    ]
+}
+```
+
+This matches only `/api/v1/page/json/about-us?language_id=1`. Query parameter order and percent-encoding are preserved; the query is not decoded or reordered. A literal `?` must be escaped as `\?` in regex (`\\?` in JSON).
+
+Prefer exact query patterns like the example above. If any numeric language ID is intended, use `"/api/v1/page/json/about-us\\?language_id=\\d+"` in JSON. Use bounded character classes such as `[^/?&]+` for a single path segment or query value, rather than `.*`. Avoid mid-pattern wildcards: `about-us.*language_id=1` also matches `about-us-private?x=language_id=1`.
+
+**Permissive option:** `"/api/v1/graphql(\\?.*)?"` allows any optional query string without validating its parameters or values. This grants the token user's privileges even for arbitrary `host_id`, `language_id`, `depth`, or GraphQL `query` values; use it only when that unrestricted query access is intentional.
+
 ## Usage
 
 ### How It Works
@@ -147,7 +168,7 @@ Configure rules in the **User Proxy / Anonymous Access** app for each site. Rule
 1. **Request Interception**: Every incoming HTTP request is intercepted by the `UserProxyInterceptor`
 2. **Pre-Authentication Check**: If the request already has valid authentication, the plugin skips processing
 3. **Configuration Lookup**: The plugin retrieves user proxy configurations for the current site/host
-4. **Rule Matching**: The request's HTTP method and URI are matched against configured rules
+4. **Rule Matching**: The request's HTTP method and URI (including the raw query string) are matched against configured rules
 5. **User Assignment**: If a match is found, the token is validated and the associated user is assigned to the request
 6. **Request Continuation**: The request continues with the authenticated user context
 
@@ -409,7 +430,7 @@ For issues, questions, or contributions:
 - Updated to dotCMS 26.10.28-02 and Java 25
 - Restored request user assignment and System Host fallback
 - Reused dotCMS Apps API caching instead of a separate versioned cache, with bounded content-keyed Caffeine caching for parsed rules
-- Restricted rules to full-path regex matching and corrected examples
+- Restricted rules to full-URI regex matching, including raw query strings, and corrected examples
 - Fixed resource copying, missing configuration handling, and malformed-JSON logging
 - Added authentication and path-matching regression tests
 
