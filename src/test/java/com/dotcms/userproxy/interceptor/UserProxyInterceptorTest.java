@@ -23,6 +23,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 class UserProxyInterceptorTest {
@@ -125,15 +127,24 @@ class UserProxyInterceptorTest {
         verify(request, never()).setAttribute(anyString(), any());
     }
 
-    @Test
-    void doesNotOverrideAuthorizationHeadersOrLoggedInUsers() {
-        when(request.getHeader("Authorization")).thenReturn("Bearer explicit-token");
-        interceptor.intercept(request, response);
-        mapper.verifyNoInteractions();
+    @ParameterizedTest
+    @ValueSource(strings = {"Bearer explicit-token", "bEaReR explicit-token", "Basic credentials", "invalid", ""})
+    void skipsAuthorizationHeadersWithoutResolvingTheUser(String authorization) {
+        when(request.getHeader("Authorization")).thenReturn(authorization);
 
-        when(request.getHeader("Authorization")).thenReturn(null);
+        assertEquals(Result.NEXT, interceptor.intercept(request, response));
+        portal.verifyNoInteractions();
+        webApis.verifyNoInteractions();
+        mapper.verifyNoInteractions();
+        verifyNoInteractions(tokens);
+        verify(request, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    void doesNotOverrideLoggedInUsers() {
         portal.when(() -> PortalUtil.getUser(request)).thenReturn(user);
-        interceptor.intercept(request, response);
+
+        assertEquals(Result.NEXT, interceptor.intercept(request, response));
         mapper.verifyNoInteractions();
         verifyNoInteractions(tokens);
     }
