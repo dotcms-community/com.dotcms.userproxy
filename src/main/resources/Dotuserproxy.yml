@@ -16,6 +16,7 @@ params:
                 {
                   "config": [
                     {
+                      "_comment": "api-user@example.com — public API access",
                       "userToken": "api-user-token-0xZjQ....",
                       "methods": "GET,POST,HEAD,OPTIONS",
                       "urls": [

@@ -72,11 +72,11 @@ public class UserProxyInterceptor implements WebInterceptor {
     }
 
     public boolean hasExistingAuth(final HttpServletRequest request) {
-        final User user = PortalUtil.getUser(request);
-        if (user != null && !user.isAnonymousUser()) {
+        if (request.getHeader("Authorization") != null) {
             return true;
         }
-        return request.getHeader("Authorization") != null;
+        final User user = PortalUtil.getUser(request);
+        return user != null && !user.isAnonymousUser();
     }
 
 }
