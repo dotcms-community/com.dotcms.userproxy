@@ -16,9 +16,9 @@ params:
                 {
                   "config": [
                     {
+                      "_comment": "api-user@example.com — public API access",
                       "userToken": "api-user-token-0xZjQ....",
                       "methods": "GET,POST,HEAD,OPTIONS",
-                      "_comment": "token for frontend@dotcms.com",
                       "urls": [
                         "/api/v1/page/json(/.*)?",
                         "/api/v1/content/_search",
